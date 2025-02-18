@@ -37,14 +37,10 @@ exports.handler = async (event) => {
       "Importante: Cómo actualizar tu Hogar con Netflix",
       "Tu código de acceso temporal de Netflix",
       "Completa tu solicitud de restablecimiento de contraseña",
-      "Tu código de acceso único para Disney+" // Nuevo asunto
+      "Tu código de acceso único para Disney+" // Asunto para Disney+
     ];
 
-    const validLinks = [
-      "https://www.netflix.com/account/travel/verify?nftoken=",
-      "https://www.netflix.com/password?g=",
-      "https://www.netflix.com/account/update-primary-location?nftoken="
-    ];
+    let foundDisney = false; // Bandera para verificar si encontramos Disney+
 
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
@@ -68,10 +64,11 @@ exports.handler = async (event) => {
       ) {
         const body = getMessageBody(message.data);
 
-        // Comprobamos si es un correo de Disney+ (asunto "Tu código de acceso único para Disney+")
+        // Comprobamos si el asunto es de Disney+ (Tu código de acceso único para Disney+)
         if (subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
-          const disneyCode = extractDisneyCode(body);
+          const disneyCode = extractDisneyCode(body); // Extraemos el código de Disney+
           if (disneyCode) {
+            foundDisney = true; // Marcar que se encontró Disney+
             return { 
               statusCode: 200, 
               body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) 
@@ -79,15 +76,19 @@ exports.handler = async (event) => {
           }
         }
 
-        // Comprobamos si es un correo de Netflix con enlaces válidos
-        const link = extractLink(body, validLinks);
-        if (link) {
-          return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
+        // Si no se ha encontrado Disney+, continuamos con la lógica de Netflix
+        if (!foundDisney) {
+          const link = extractLink(body, validLinks);
+          if (link) {
+            return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
+          }
         }
       }
     }
 
+    // Si no se encontró ni Disney ni Netflix
     return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontrado un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
