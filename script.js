@@ -1,18 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consulta de Códigos</title>
-</head>
-<body>
-  <form id="emailForm">
-    <label for="email">Correo Electrónico:</label>
-    <input type="email" id="email" name="email" required />
-    <button type="submit">Consultar Código</button>
-  </form>
-
-  <script>
+<script>
     document.getElementById("emailForm").addEventListener("submit", async function(event) {
       event.preventDefault();
       var email = document.getElementById("email").value;
