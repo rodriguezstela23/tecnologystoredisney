@@ -32,8 +32,12 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ message: "No hay mensajes recientes" }) };
     }
 
-    // 🔹 Lógica para buscar correos de Disney+
-    const disneySubject = "Tu código de acceso único para Disney+";
+    // 🔹 Filtrar correos por asunto para Disney
+    const validSubjects = [
+      "Tu código de acceso único para Disney+"
+    ];
+
+
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -42,6 +46,12 @@ exports.handler = async (event) => {
       const dateHeader = headers.find(h => h.name === "Date");
       const timestamp = new Date(dateHeader.value).getTime();
       const now = new Date().getTime();
+
+      console.log("📤 Destinatario del correo:", toHeader ? toHeader.value : "No encontrado");
+      console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
+      console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
+      console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
+      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       if (
         toHeader &&
