@@ -37,14 +37,17 @@ exports.handler = async (event) => {
       "Importante: Cómo actualizar tu Hogar con Netflix",
       "Tu código de acceso temporal de Netflix",
       "Completa tu solicitud de restablecimiento de contraseña",
-      "Tu código de acceso único para Disney+" // Añadir el asunto de Disney+
+      "Tu código de acceso único para Disney+" // Agregado para Disney+
     ];
 
     const validLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/password?g=",
-      "https://www.netflix.com/account/update-primary-location?nftoken="
+      "https://www.netflix.com/account/update-primary-location?nftoken=",
+      "Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos."
     ];
+
+    let disneyCode = null; // Variable para almacenar el código de Disney+
 
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
@@ -59,20 +62,20 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
+      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
-      // 🔹 Verificar si el asunto es de Disney+
-      if (subjectHeader && subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
+      // Lógica para Disney+
+      if (subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
         const body = getMessageBody(message.data);
-        console.log("Cuerpo del mensaje de Disney+:", body); // Imprimir el cuerpo del mensaje para verificar
+        const match = body.match(/Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos.\s*(\d{6})\s*Si no lo solicitaste, en el Centro de ayuda/);
 
-        // Extraer el código de Disney+
-        const disneyCode = extractDisneyCode(body);
-        if (disneyCode) {
-          console.log("Código de Disney+ encontrado:", disneyCode); // Imprimir el código
-          return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) };
+        if (match && match[1]) {
+          disneyCode = match[1];
+          break; // Si encontramos el código de Disney+, lo priorizamos y salimos del loop
         }
       }
 
+      // Lógica para Netflix
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
@@ -87,13 +90,22 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+    // Si se encontró el código de Disney+
+    if (disneyCode) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: `Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos.\n\n${disneyCode}\n\nSi no lo solicitaste, en el Centro de ayuda`,
+        }),
+      };
+    }
+
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontrado un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-// Función para extraer el cuerpo del mensaje
 function getMessageBody(message) {
   if (!message.payload.parts) {
     return message.snippet || "";
@@ -106,42 +118,26 @@ function getMessageBody(message) {
   return "";
 }
 
-// Función para extraer el código de Disney+
-function extractDisneyCode(body) {
-  console.log("Cuerpo completo del mensaje:", body); // Ver el cuerpo completo del mensaje para asegurarnos de que está siendo procesado
-  const regex = /Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos\.(\d+)/;
-  const match = body.match(regex);
-  if (match) {
-    return match[1]; // El código está en el grupo 1 de la regex
-  }
-  return null;
-}
-
-// Función para extraer enlaces válidos
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
   if (matches) {
     console.log("🔗 Enlaces encontrados en el correo:", matches);
 
-    // Primero, buscaremos los enlaces válidos de tipo "account/travel/verify" o "account/update-primary-location"
     const preferredLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
-    // Buscamos primero los enlaces prioritarios (travel/verify o update-primary-location)
     const validLink = matches.find(url =>
       preferredLinks.some(valid => url.includes(valid))
     );
 
-    // Si encontramos un enlace válido de los mencionados, se redirige a él
     if (validLink) {
       console.log("🔗 Redirigiendo al enlace válido encontrado:", validLink);
       return validLink.replace(/\]$/, "");
     }
 
-    // Si no encontramos ninguno de los enlaces prioritarios, buscamos el enlace "password?g="
     const fallbackLink = matches.find(url => url.includes("https://www.netflix.com/password?g="));
 
     if (fallbackLink) {
