@@ -54,8 +54,13 @@ exports.handler = async (event) => {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
       const subjectHeader = headers.find(h => h.name === "Subject");
-      const body = getMessageBody(message.data);
-      console.log("Cuerpo del correo:", body); // Verificamos el cuerpo del correo
+      let body = getMessageBody(message.data);
+
+      // Limpiar el cuerpo del mensaje (eliminamos etiquetas HTML, saltos de línea, etc.)
+      body = body.replace(/<\/?[^>]+(>|$)/g, ""); // Elimina etiquetas HTML
+      body = body.replace(/\n/g, " "); // Reemplaza saltos de línea por espacios
+
+      console.log("Cuerpo limpio del correo:", body); // Verificamos el cuerpo limpio
 
       // Si encontramos un correo de Disney+ y extraemos el código
       if (subjectHeader && subjectHeader.value === disneySubject) {
