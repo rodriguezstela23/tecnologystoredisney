@@ -45,16 +45,8 @@ exports.handler = async (event) => {
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
-    const validDisneyPlusSubjects = [
-      "Tu código de acceso único para Disney+"
-    ];
+    const disneyPlusSubject = "Tu código de acceso único para Disney+";
 
-    const disneyPlusCodeRegex = /\b\d{6}\b/; // Regex para buscar un código de 6 dígitos
-
-    let foundLink = null;
-    let foundDisneyCode = null;
-
-    // Buscar entre los correos
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -70,22 +62,16 @@ exports.handler = async (event) => {
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
       console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
-      // 🔹 Lógica para Disney Plus
-      if (
-        toHeader &&
-        toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        validDisneyPlusSubjects.some(subject => subjectHeader.value.includes(subject)) &&
-        (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
-      ) {
+      // 🔹 Lógica para Disney Plus: verificar asunto y extraer código
+      if (subjectHeader && subjectHeader.value === disneyPlusSubject) {
         const body = getMessageBody(message.data);
-        const codeMatch = body.match(disneyPlusCodeRegex);
-        if (codeMatch) {
-          foundDisneyCode = codeMatch[0]; // Extraemos el código de 6 dígitos
-          break; // Si encontramos el código, terminamos la búsqueda
+        const disneyCode = extractDisneyPlusCode(body);
+        if (disneyCode) {
+          return { statusCode: 200, body: JSON.stringify({ message: `Disney Plus Código: ${disneyCode}` }) };
         }
       }
 
-      // 🔹 Lógica para Netflix (sin cambios)
+      // 🔹 Lógica para Netflix: buscar los enlaces de Netflix
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
@@ -95,23 +81,12 @@ exports.handler = async (event) => {
         const body = getMessageBody(message.data);
         const link = extractLink(body, validNetflixLinks);
         if (link) {
-          foundLink = link.replace(/\]$/, ""); // Preparamos el link
-          break; // Si encontramos el link de Netflix, terminamos la búsqueda
+          return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
         }
       }
     }
 
-    // Si encontramos el código de Disney Plus
-    if (foundDisneyCode) {
-      return { statusCode: 200, body: JSON.stringify({ message: `Disney Plus Código: ${foundDisneyCode}` }) };
-    }
-
-    // Si encontramos el link de Netflix
-    if (foundLink) {
-      return { statusCode: 200, body: JSON.stringify({ link: foundLink }) };
-    }
-
-    return { statusCode: 404, body: JSON.stringify({ message: "No se encontró un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
@@ -127,6 +102,17 @@ function getMessageBody(message) {
     }
   }
   return "";
+}
+
+function extractDisneyPlusCode(text) {
+  // Buscar un patrón de 6 dígitos en el cuerpo del correo
+  const codeRegex = /\b\d{6}\b/;
+  const match = text.match(codeRegex);
+
+  if (match) {
+    return match[0]; // Retorna el primer código de 6 dígitos encontrado
+  }
+  return null;
 }
 
 function extractLink(text, validLinks) {
