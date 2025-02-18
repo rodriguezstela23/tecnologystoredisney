@@ -33,47 +33,19 @@ exports.handler = async (event) => {
     }
 
     // 🔹 Filtrar correos por asunto
-    const validNetflixSubjects = [
+    const validSubjects = [
       "Importante: Cómo actualizar tu Hogar con Netflix",
       "Tu código de acceso temporal de Netflix",
-      "Completa tu solicitud de restablecimiento de contraseña"
+      "Completa tu solicitud de restablecimiento de contraseña",
+      "Tu código de acceso único para Disney+" // Añadir el asunto de Disney+
     ];
 
-    const validNetflixLinks = [
+    const validLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/password?g=",
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
-    // Nuevo asunto y regex para Disney+
-    const disneySubject = "Tu código de acceso único para Disney+";
-    const disneyCodeRegex = /Es\s*necesario\s*que\s*verifiques\s*la\s*dirección\s*de\s*correo\s*electrónico\s*asociada\s*a\s*tu\s*cuenta\s*de\s*MyDisney\s*con\s*este\s*código\s*de\s*acceso\s*que\s*vencerá\s*en\s*15\s*minutos\.\s*(\d{4,6})\s*Si\s*no\s*lo\s*solicitaste/;
-
-    // Buscar el código de Disney+ primero
-    for (let msg of response.data.messages) {
-      const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
-      const headers = message.data.payload.headers;
-      const subjectHeader = headers.find(h => h.name === "Subject");
-      let body = getMessageBody(message.data);
-
-      // Limpiar el cuerpo del mensaje (eliminamos etiquetas HTML, saltos de línea, etc.)
-      body = body.replace(/<\/?[^>]+(>|$)/g, ""); // Elimina etiquetas HTML
-      body = body.replace(/\n+/g, " "); // Reemplaza múltiples saltos de línea por un solo espacio
-
-      console.log("Cuerpo limpio del correo:", body); // Verificamos el cuerpo limpio
-
-      // Si encontramos un correo de Disney+ y extraemos el código
-      if (subjectHeader && subjectHeader.value === disneySubject) {
-        const match = body.match(disneyCodeRegex);
-        if (match) {
-          const disneyCode = match[1]; // El código extraído
-          console.log("Código de Disney+ encontrado:", disneyCode); // Verificamos el código extraído
-          return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) };
-        }
-      }
-    }
-
-    // Si no encontramos código de Disney+, buscar Netflix
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -87,15 +59,27 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
+      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
+
+      // 🔹 Verificar si el asunto es de Disney+
+      if (subjectHeader && subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
+        const body = getMessageBody(message.data);
+
+        // Extraer el código de Disney+
+        const disneyCode = extractDisneyCode(body);
+        if (disneyCode) {
+          return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) };
+        }
+      }
 
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        validNetflixSubjects.some(subject => subjectHeader.value.includes(subject)) &&
+        validSubjects.some(subject => subjectHeader.value.includes(subject)) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
         const body = getMessageBody(message.data);
-        const link = extractLink(body, validNetflixLinks);
+        const link = extractLink(body, validLinks);
         if (link) {
           return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
         }
@@ -108,6 +92,7 @@ exports.handler = async (event) => {
   }
 };
 
+// Función para extraer el cuerpo del mensaje
 function getMessageBody(message) {
   if (!message.payload.parts) {
     return message.snippet || "";
@@ -120,6 +105,17 @@ function getMessageBody(message) {
   return "";
 }
 
+// Función para extraer el código de Disney+
+function extractDisneyCode(body) {
+  const regex = /Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos\.(\d{6})/;
+  const match = body.match(regex);
+  if (match) {
+    return match[1]; // El código está en el grupo 1 de la regex
+  }
+  return null;
+}
+
+// Función para extraer enlaces válidos
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
