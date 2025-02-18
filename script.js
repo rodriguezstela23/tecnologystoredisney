@@ -13,7 +13,7 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
     // Si encontramos un mensaje de Disney+
     if (data.alert) {
         // Mostrar solo la parte del cuerpo del mensaje desde el caracter 385 hasta el 624
-        const fragment = data.body.substring(385, 624);
+        const fragment = data.body.substring(394, 602);
         alert(`¡Código de Disney+ encontrado! \n\n${fragment}`);
     } 
     // Si encontramos un enlace de Netflix
