@@ -16,9 +16,9 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
         window.location.href = data.link; // Redirige automáticamente a Netflix
     } 
     // Verificar si se encuentra el código de Disney Plus
-    else if (data.message && data.message.startsWith("Disney Plus Código")) {
+    else if (data.message && data.message.startsWith("Código Disney Plus:")) {
         // Aquí mostramos el mensaje del código de Disney Plus de una forma clara
-        alert(data.message); // Muestra el código de Disney Plus en un popup
+        alert(data.message); // Muestra el mensaje con el código de Disney Plus
     } 
     else {
         // Si no encontramos ningún enlace ni código de Disney Plus, mostramos un mensaje genérico
