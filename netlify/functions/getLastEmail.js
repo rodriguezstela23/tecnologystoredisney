@@ -32,7 +32,7 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ message: "No hay mensajes recientes" }) };
     }
 
-    // 🔹 Filtrar correos por asunto de Disney Plus y Netflix
+    // 🔹 Filtrar correos por asunto
     const validNetflixSubjects = [
       "Importante: Cómo actualizar tu Hogar con Netflix",
       "Tu código de acceso temporal de Netflix",
@@ -45,8 +45,16 @@ exports.handler = async (event) => {
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
-    const disneyPlusSubject = "Tu código de acceso único para Disney+";
+    const validDisneyPlusSubjects = [
+      "Tu código de acceso único para Disney+"
+    ];
 
+    const disneyPlusCodeRegex = /\b\d{6}\b/; // Regex para buscar un código de 6 dígitos
+
+    let foundLink = null;
+    let foundDisneyCode = null;
+
+    // Buscar entre los correos
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -62,18 +70,22 @@ exports.handler = async (event) => {
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
       console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
-      // 🔹 Lógica para Disney Plus: verificar asunto y extraer código
-      if (subjectHeader && subjectHeader.value === disneyPlusSubject) {
+      // Verificar correos de Disney Plus
+      if (
+        toHeader &&
+        toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
+        validDisneyPlusSubjects.some(subject => subjectHeader.value.includes(subject)) &&
+        (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
+      ) {
         const body = getMessageBody(message.data);
-        console.log("📝 Cuerpo de Disney Plus:", body);
-        const disneyCode = extractDisneyPlusCode(body);
-        if (disneyCode) {
-          console.log("🎉 Disney Plus Código encontrado:", disneyCode);
-          return { statusCode: 200, body: JSON.stringify({ message: `Disney Plus Código: ${disneyCode}` }) };
+        const codeMatch = body.match(disneyPlusCodeRegex);
+        if (codeMatch) {
+          foundDisneyCode = codeMatch[0]; // Extraemos el código de 6 dígitos
+          break; // Si encontramos el código, terminamos la búsqueda
         }
       }
 
-      // 🔹 Lógica para Netflix: buscar los enlaces de Netflix
+      // Si no encontramos código de Disney Plus, buscamos por Netflix
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
@@ -83,82 +95,54 @@ exports.handler = async (event) => {
         const body = getMessageBody(message.data);
         const link = extractLink(body, validNetflixLinks);
         if (link) {
-          return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
+          foundLink = link.replace(/\]$/, ""); // Preparamos el link
+          break; // Si encontramos el link de Netflix, terminamos la búsqueda
         }
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+    // Si encontramos código de Disney Plus
+    if (foundDisneyCode) {
+      return { statusCode: 200, body: JSON.stringify({ message: `Disney Plus Código: ${foundDisneyCode}` }) };
+    }
+
+    // Si encontramos link de Netflix
+    if (foundLink) {
+      return { statusCode: 200, body: JSON.stringify({ link: foundLink }) };
+    }
+
+    return { statusCode: 404, body: JSON.stringify({ message: "No se encontró un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
-    console.error("Error durante la ejecución:", error);
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-// 📝 Función para extraer el cuerpo del correo, en formato HTML y plain text
 function getMessageBody(message) {
-  if (message.payload.parts) {
-    // Revisar si hay partes en HTML o texto plano
-    for (let part of message.payload.parts) {
-      if (part.mimeType === "text/html" && part.body.data) {
-        // Convertir el cuerpo HTML en texto plano
-        const htmlBody = Buffer.from(part.body.data, "base64").toString("utf-8");
-        console.log("🌐 Cuerpo en HTML:", htmlBody); // Verifica si está tomando el cuerpo HTML
-        return htmlBody; // Devuelve el cuerpo HTML
-      }
-      if (part.mimeType === "text/plain" && part.body.data) {
-        const textBody = Buffer.from(part.body.data, "base64").toString("utf-8");
-        console.log("📝 Cuerpo en texto plano:", textBody); // Verifica si está tomando el cuerpo de texto
-        return textBody; // Devuelve el cuerpo en texto plano
-      }
+  if (!message.payload.parts) {
+    return message.snippet || "";
+  }
+  for (let part of message.payload.parts) {
+    if (part.mimeType === "text/plain" && part.body.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
     }
   }
   return "";
 }
 
-// 🔍 Función para extraer el código de Disney Plus
-function extractDisneyPlusCode(text) {
-  // Ajustar expresión regular para capturar cualquier código de 6 dígitos
-  const codeRegex = /\b(\d{6})\b/g; // Utilizamos una búsqueda más flexible
-  const matches = text.match(codeRegex);
-
-  if (matches && matches.length > 0) {
-    console.log("📬 Códigos encontrados en el correo de Disney Plus:", matches);
-    return matches[0]; // Retornar el primer código de 6 dígitos encontrado
-  }
-  return null;
-}
-
-// 🔗 Función para extraer el enlace de Netflix
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
   if (matches) {
     console.log("🔗 Enlaces encontrados en el correo:", matches);
 
-    // Primero, buscaremos los enlaces válidos de tipo "account/travel/verify" o "account/update-primary-location"
-    const preferredLinks = [
-      "https://www.netflix.com/account/travel/verify?nftoken=",
-      "https://www.netflix.com/account/update-primary-location?nftoken="
-    ];
-
-    // Buscamos primero los enlaces prioritarios (travel/verify o update-primary-location)
+    // Buscar enlaces válidos de Netflix
     const validLink = matches.find(url =>
-      preferredLinks.some(valid => url.includes(valid))
+      validLinks.some(valid => url.includes(valid))
     );
 
-    // Si encontramos un enlace válido de los mencionados, se redirige a él
     if (validLink) {
       console.log("🔗 Redirigiendo al enlace válido encontrado:", validLink);
       return validLink.replace(/\]$/, "");
-    }
-
-    // Si no encontramos ninguno de los enlaces prioritarios, buscamos el enlace "password?g="
-    const fallbackLink = matches.find(url => url.includes("https://www.netflix.com/password?g="));
-
-    if (fallbackLink) {
-      console.log("🔗 Redirigiendo al enlace de fallback encontrado:", fallbackLink);
-      return fallbackLink.replace(/\]$/, "");
     }
   }
   return null;
