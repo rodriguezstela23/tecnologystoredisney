@@ -17,7 +17,7 @@ exports.handler = async (event) => {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    // 🔹 Verificar en qué cuenta está buscando correos
+    // Verificar en qué cuenta está buscando correos
     const gmailProfile = await gmail.users.getProfile({ userId: "me" });
     console.log("🔍 Buscando correos en la cuenta:", gmailProfile.data.emailAddress);
 
@@ -32,69 +32,60 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ message: "No hay mensajes recientes" }) };
     }
 
-    // 🔹 Filtrar correos por asunto
+    // Buscar en los correos si hay algún mensaje con el asunto de Disney
     const disneySubject = "Tu código de acceso único para Disney+";
-    const validDisneyLinks = [
-      "https://www.disneyplus.com/account/verify",
-      "https://www.disneyplus.com/password-reset"
-    ];
 
-    // 🔹 Buscando correos de Disney+
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
       const toHeader = headers.find(h => h.name === "To");
       const subjectHeader = headers.find(h => h.name === "Subject");
-      const dateHeader = headers.find(h => h.name === "Date");
-      const timestamp = new Date(dateHeader.value).getTime();
-      const now = new Date().getTime();
 
-      console.log("📤 Destinatario del correo:", toHeader ? toHeader.value : "No encontrado");
-      console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
-      console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
-      console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
-      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
+      if (subjectHeader && subjectHeader.value.includes(disneySubject)) {
+        console.log("🎯 Correo con asunto de Disney+ encontrado");
 
-      if (
-        toHeader &&
-        toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        subjectHeader && subjectHeader.value.includes(disneySubject) &&
-        (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
-      ) {
+        // Obtener el cuerpo del mensaje (en base64)
         const body = getMessageBody(message.data);
-        const code = extractDisneyCode(body);
-        if (code) {
-          // Si encontramos el código de Disney+, lo mostramos
-          return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${code}` }) };
+        
+        // Buscar el código de Disney+ en el cuerpo (en base64 decodificado)
+        const disneyCode = extractDisneyCode(body);
+
+        if (disneyCode) {
+          return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es: ${disneyCode}` }) };
+        } else {
+          return { statusCode: 404, body: JSON.stringify({ message: "No se encontró el código de Disney+" }) };
         }
       }
     }
 
-    // Si no se encuentra el código de Disney+, retornar mensaje de error
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontrado el código de Disney Plus en los correos" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se encontró ningún correo de Disney+" }) };
+
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
+// Función para obtener el cuerpo del mensaje
 function getMessageBody(message) {
   if (!message.payload.parts) {
     return message.snippet || "";
   }
   for (let part of message.payload.parts) {
-    if (part.mimeType === "text/plain" && part.body.data) {
+    if (part.mimeType === "text/html" && part.body.data) {
       return Buffer.from(part.body.data, "base64").toString("utf-8");
     }
   }
   return "";
 }
 
-// Función para extraer el código de Disney+
-function extractDisneyCode(text) {
-  const codeRegex = /\b\d{6}\b/g; // Suponiendo que el código es de 6 dígitos
-  const matches = text.match(codeRegex);
-  if (matches && matches.length > 0) {
-    return matches[0]; // Retorna el primer código encontrado
+// Función para extraer el código de Disney+ utilizando una expresión regular
+function extractDisneyCode(body) {
+  // La expresión regular busca el código dentro del HTML del mensaje
+  const codeRegex = /Tu código de acceso único para Disney\+ es (\d{6})/;
+  const match = body.match(codeRegex);
+
+  if (match) {
+    return match[1]; // Retorna el código encontrado
   }
-  return null;
+  return null; // Si no se encuentra, retorna null
 }
