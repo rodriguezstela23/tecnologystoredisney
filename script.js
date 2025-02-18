@@ -10,9 +10,10 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
 
   const data = await response.json();
 
-  if (data.message && data.message.includes("Tu código de Disney Plus")) {
-    // Si la respuesta contiene el código de Disney+
-    alert(data.message); // Muestra el mensaje con el código
+  // Verificamos si la respuesta contiene el mensaje completo con el código de Disney+
+  if (data.message && data.message.includes("Tu código de acceso único para Disney+")) {
+    // Si la respuesta contiene el mensaje completo de Disney+, lo mostramos
+    document.getElementById("messageDisplay").innerText = data.message; // Mostrar el cuerpo completo
   } else if (data.link) {
     // Si se encuentra el link (probablemente de Netflix)
     window.location.href = data.link; // Redirige automáticamente
