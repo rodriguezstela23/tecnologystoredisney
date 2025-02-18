@@ -58,7 +58,7 @@ exports.handler = async (event) => {
 
       // Limpiar el cuerpo del mensaje (eliminamos etiquetas HTML, saltos de línea, etc.)
       body = body.replace(/<\/?[^>]+(>|$)/g, ""); // Elimina etiquetas HTML
-      body = body.replace(/\n/g, " "); // Reemplaza saltos de línea por espacios
+      body = body.replace(/\n+/g, " "); // Reemplaza múltiples saltos de línea por un solo espacio
 
       console.log("Cuerpo limpio del correo:", body); // Verificamos el cuerpo limpio
 
