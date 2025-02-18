@@ -1,23 +1,40 @@
-document.getElementById("emailForm").addEventListener("submit", async function(event) {
-  event.preventDefault();
-  var email = document.getElementById("email").value;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consulta de Códigos</title>
+</head>
+<body>
+  <form id="emailForm">
+    <label for="email">Correo Electrónico:</label>
+    <input type="email" id="email" name="email" required />
+    <button type="submit">Consultar Código</button>
+  </form>
 
-  const response = await fetch("/.netlify/functions/getLastEmail", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
+  <script>
+    document.getElementById("emailForm").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      var email = document.getElementById("email").value;
 
-  const data = await response.json();
+      const response = await fetch("/.netlify/functions/getLastEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-  // Verificamos si la respuesta contiene el mensaje completo con el código de Disney+
-  if (data.message && data.message.includes("Tu código de acceso único para Disney+")) {
-    // Si la respuesta contiene el mensaje completo de Disney+, lo mostramos
-    document.getElementById("messageDisplay").innerText = data.message; // Mostrar el cuerpo completo
-  } else if (data.link) {
-    // Si se encuentra el link (probablemente de Netflix)
-    window.location.href = data.link; // Redirige automáticamente
-  } else {
-    alert("No se encontró resultado para tu cuenta, vuelve a intentarlo nuevamente.");
-  }
-});
+      const data = await response.json();
+
+      if (data.message && data.message.includes("Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney")) {
+        // Si se encuentra el código de Disney+
+        alert(data.message); // Muestra el mensaje con el código de Disney
+      } else if (data.link) {
+        // Si se encuentra el link de Netflix
+        window.location.href = data.link; // Redirige automáticamente
+      } else {
+        alert("No se encontró resultado para tu cuenta, vuelve a intentarlo nuevamente.");
+      }
+    });
+  </script>
+</body>
+</html>
