@@ -59,15 +59,16 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
-      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       // 🔹 Verificar si el asunto es de Disney+
       if (subjectHeader && subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
         const body = getMessageBody(message.data);
+        console.log("Cuerpo del mensaje de Disney+:", body); // Imprimir el cuerpo del mensaje para verificar
 
         // Extraer el código de Disney+
         const disneyCode = extractDisneyCode(body);
         if (disneyCode) {
+          console.log("Código de Disney+ encontrado:", disneyCode); // Imprimir el código
           return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) };
         }
       }
@@ -107,7 +108,8 @@ function getMessageBody(message) {
 
 // Función para extraer el código de Disney+
 function extractDisneyCode(body) {
-  const regex = /Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos\.(\d{6})/;
+  console.log("Cuerpo completo del mensaje:", body); // Ver el cuerpo completo del mensaje para asegurarnos de que está siendo procesado
+  const regex = /Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos\.(\d+)/;
   const match = body.match(regex);
   if (match) {
     return match[1]; // El código está en el grupo 1 de la regex
