@@ -65,6 +65,7 @@ exports.handler = async (event) => {
       // 🔹 Lógica para Disney Plus: verificar asunto y extraer código
       if (subjectHeader && subjectHeader.value === disneyPlusSubject) {
         const body = getMessageBody(message.data);
+        console.log("📝 Cuerpo de Disney Plus:", body);
         const disneyCode = extractDisneyPlusCode(body);
         if (disneyCode) {
           console.log("🎉 Disney Plus Código encontrado:", disneyCode);
@@ -94,21 +95,31 @@ exports.handler = async (event) => {
   }
 };
 
+// 📝 Función para extraer el cuerpo del correo, en formato HTML y plain text
 function getMessageBody(message) {
-  if (!message.payload.parts) {
-    return message.snippet || "";
-  }
-  for (let part of message.payload.parts) {
-    if (part.mimeType === "text/plain" && part.body.data) {
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
+  if (message.payload.parts) {
+    // Revisar si hay partes en HTML o texto plano
+    for (let part of message.payload.parts) {
+      if (part.mimeType === "text/html" && part.body.data) {
+        // Convertir el cuerpo HTML en texto plano
+        const htmlBody = Buffer.from(part.body.data, "base64").toString("utf-8");
+        console.log("🌐 Cuerpo en HTML:", htmlBody); // Verifica si está tomando el cuerpo HTML
+        return htmlBody; // Devuelve el cuerpo HTML
+      }
+      if (part.mimeType === "text/plain" && part.body.data) {
+        const textBody = Buffer.from(part.body.data, "base64").toString("utf-8");
+        console.log("📝 Cuerpo en texto plano:", textBody); // Verifica si está tomando el cuerpo de texto
+        return textBody; // Devuelve el cuerpo en texto plano
+      }
     }
   }
   return "";
 }
 
+// 🔍 Función para extraer el código de Disney Plus
 function extractDisneyPlusCode(text) {
   // Ajustar expresión regular para capturar cualquier código de 6 dígitos
-  const codeRegex = /(\d{6})/g;
+  const codeRegex = /\b(\d{6})\b/g; // Utilizamos una búsqueda más flexible
   const matches = text.match(codeRegex);
 
   if (matches && matches.length > 0) {
@@ -118,6 +129,7 @@ function extractDisneyPlusCode(text) {
   return null;
 }
 
+// 🔗 Función para extraer el enlace de Netflix
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
