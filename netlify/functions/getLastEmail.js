@@ -100,32 +100,48 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
+// Función para extraer el código de Disney+ de la sección específica del correo
+function extractDisneyCode(text) {
+  const startPhrase = "Es necesario que verifiques la dirección de correo electrónico asociada a tu cuenta de MyDisney con este código de acceso que vencerá en 15 minutos.";
+  const endPhrase = "Si no lo solicitaste, en el Centro de ayuda hay más información.";
+
+  // Buscar el texto entre las dos frases
+  const regex = new RegExp(`${startPhrase}(.*?)${endPhrase}`, "s");
+  const match = text.match(regex);
+
+  if (match && match[1]) {
+    // Ahora extraemos el código que es un número de 6 dígitos
+    const codeRegex = /\b\d{6}\b/g;
+    const codeMatch = match[1].match(codeRegex);
+    if (codeMatch && codeMatch.length > 0) {
+      return codeMatch[0]; // Retorna el primer código encontrado
+    }
+  }
+  return null;
+}
+
+// Función para obtener el cuerpo del mensaje
 function getMessageBody(message) {
   if (!message.payload.parts) {
     return message.snippet || "";
   }
   for (let part of message.payload.parts) {
+    // Si el cuerpo es de tipo texto plano, lo extraemos
     if (part.mimeType === "text/plain" && part.body.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
+    }
+    // Si el cuerpo es de tipo HTML, lo extraemos también
+    if (part.mimeType === "text/html" && part.body.data) {
       return Buffer.from(part.body.data, "base64").toString("utf-8");
     }
   }
   return "";
-}
-
-// Función para extraer el código de Disney+
-function extractDisneyCode(text) {
-  const codeRegex = /\b\d{6}\b/g; // Suponiendo que el código es de 6 dígitos
-  const matches = text.match(codeRegex);
-  if (matches && matches.length > 0) {
-    return matches[0]; // Retorna el primer código encontrado
-  }
-  return null;
 }
 
 // Función para extraer el enlace de Netflix
