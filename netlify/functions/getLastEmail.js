@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const { google } = require("googleapis");
 
 exports.handler = async (event) => {
@@ -64,18 +64,11 @@ exports.handler = async (event) => {
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        validSubjects.some(subject => subjectHeader.value.includes(subject)) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
         const body = getMessageBody(message.data);
-        const link = extractLink(body, validLinks);
-        
-        // Si encontramos un enlace de Netflix
-        if (link) {
-          return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
-        }
-        
-        // Si es el código de Disney+
+
+        // Comprobamos si es un correo de Disney+ (asunto "Tu código de acceso único para Disney+")
         if (subjectHeader.value.includes("Tu código de acceso único para Disney+")) {
           const disneyCode = extractDisneyCode(body);
           if (disneyCode) {
@@ -84,6 +77,12 @@ exports.handler = async (event) => {
               body: JSON.stringify({ message: `Tu código de Disney Plus es ${disneyCode}` }) 
             };
           }
+        }
+
+        // Comprobamos si es un correo de Netflix con enlaces válidos
+        const link = extractLink(body, validLinks);
+        if (link) {
+          return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
         }
       }
     }
@@ -118,7 +117,7 @@ function extractDisneyCode(text) {
   return null;
 }
 
-// Función para extraer los enlaces válidos
+// Función para extraer los enlaces válidos de Netflix
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
