@@ -1,3 +1,6 @@
+require("dotenv").config();
+const { google } = require("googleapis");
+
 exports.handler = async (event) => {
   try {
     const { email } = JSON.parse(event.body);
@@ -29,7 +32,7 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ message: "No hay mensajes recientes" }) };
     }
 
-    // 🔹 Buscar correo con el asunto de Disney+
+    // 🔹 Lógica para buscar correos de Disney+
     const disneySubject = "Tu código de acceso único para Disney+";
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
@@ -40,28 +43,22 @@ exports.handler = async (event) => {
       const timestamp = new Date(dateHeader.value).getTime();
       const now = new Date().getTime();
 
-      console.log("📤 Destinatario del correo:", toHeader ? toHeader.value : "No encontrado");
-      console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
-      console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
-      console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
-      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
-
-      // Verificar si el correo coincide con el email y el asunto de Disney+
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        subjectHeader.value.includes(disneySubject) &&
+        subjectHeader && subjectHeader.value.includes(disneySubject) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
         const body = getMessageBody(message.data);
         const code = extractDisneyCode(body);
         if (code) {
+          // Si encontramos el código de Disney+, lo mostramos
           return { statusCode: 200, body: JSON.stringify({ message: `Tu código de Disney Plus es ${code}` }) };
         }
       }
     }
 
-    // 🔹 Continuar con la lógica de Netflix si no se encuentra el código de Disney+
+    // 🔹 Filtrar correos por asunto para Netflix
     const validSubjects = [
       "Importante: Cómo actualizar tu Hogar con Netflix",
       "Tu código de acceso temporal de Netflix",
