@@ -10,10 +10,10 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
 
     const data = await response.json();
 
-    // Si encontramos un enlace de Disney+
+    // Si encontramos un código de Disney+
     if (data.alert) {
-        // Mostrar el cuerpo del mensaje de Disney+ en una alerta
-        alert(`¡Código de Disney+ encontrado! \n\n${data.body}`);
+        // Mostrar el código de Disney+ en una alerta
+        alert(data.alert);
     } 
     // Si encontramos un enlace de Netflix
     else if (data.link) {
