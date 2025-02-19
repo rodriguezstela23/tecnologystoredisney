@@ -32,21 +32,12 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ message: "No hay mensajes recientes" }) };
     }
 
-    // 🔹 Filtrar correos por asunto
-    const validSubjects = [
-      "Importante: Cómo actualizar tu Hogar con Netflix",
-      "Tu código de acceso temporal de Netflix",
-      "Completa tu solicitud de restablecimiento de contraseña",
-      "Tu código de acceso único para Disney+" // Agregar asunto de Disney+ aquí
-    ];
+    // -------------- Lógica de Disney+ -----------------
+    const disneySubject = "Tu código de acceso único para Disney+";
+    const disneyLink = "https://www.disneyplus.com/codigo";
+    let disneyFound = false;
 
-    const validLinks = [
-      "https://www.netflix.com/account/travel/verify?nftoken=",
-      "https://www.netflix.com/password?g=",
-      "https://www.netflix.com/account/update-primary-location?nftoken="
-    ];
-
-    // Primero, busca correos con el asunto de Disney+ y procesa antes de los de Netflix
+    // Filtrar correos por asunto de Disney+
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -62,22 +53,35 @@ exports.handler = async (event) => {
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
       console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
-      // Verificar si es un correo con asunto de Disney+
+      // Verificar si es un correo de Disney+ con el código de acceso
       if (
         toHeader &&
         toHeader.value.toLowerCase().includes(email.toLowerCase()) &&
-        subjectHeader.value.includes("Tu código de acceso único para Disney+") &&
+        subjectHeader.value.includes(disneySubject) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
         const body = getMessageBody(message.data);
         console.log("🎬 Cuerpo del mensaje Disney+:", body);
-
-        // Retornar el cuerpo del mensaje de Disney+ para mostrarlo en el frontend
+        
+        // Si encontramos Disney+, retornamos el cuerpo
         return { statusCode: 200, body: JSON.stringify({ alert: "Código de Disney+ encontrado", body }) };
       }
     }
 
-    // Si no se encontró Disney+, sigue con la lógica de Netflix
+    // Si no encontramos Disney+, ejecutamos la lógica de Netflix
+    // -------------- Lógica de Netflix -----------------
+    const validSubjects = [
+      "Importante: Cómo actualizar tu Hogar con Netflix",
+      "Tu código de acceso temporal de Netflix",
+      "Completa tu solicitud de restablecimiento de contraseña"
+    ];
+
+    const validLinks = [
+      "https://www.netflix.com/account/travel/verify?nftoken=",
+      "https://www.netflix.com/password?g=",
+      "https://www.netflix.com/account/update-primary-location?nftoken="
+    ];
+
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -107,7 +111,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontrado un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
@@ -115,25 +119,15 @@ exports.handler = async (event) => {
 
 // Función actualizada para obtener el cuerpo completo (HTML o texto)
 function getMessageBody(message) {
-  // Primero revisamos si ya existe una parte que contenga contenido HTML
-  if (message.payload.parts) {
-    // Recorremos todas las partes
-    for (let part of message.payload.parts) {
-      if (part.mimeType === "text/html" && part.body.data) {
-        // Si encontramos contenido HTML, lo decodificamos y lo retornamos
-        return Buffer.from(part.body.data, "base64").toString("utf-8");
-      }
+  if (!message.payload.parts) {
+    return message.snippet || "";
+  }
+  for (let part of message.payload.parts) {
+    if (part.mimeType === "text/plain" && part.body.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
     }
   }
-
-  // Si no encontramos parte HTML, buscamos en el texto plano
-  if (message.payload.body.data) {
-    // Si no hay partes HTML, devolvemos la parte de texto plano
-    return Buffer.from(message.payload.body.data, "base64").toString("utf-8");
-  }
-
-  // Si no hay cuerpo en texto plano o HTML, retornamos el snippet (una vista previa del mensaje)
-  return message.snippet || "";
+  return "";
 }
 
 // Función para extraer enlaces válidos
