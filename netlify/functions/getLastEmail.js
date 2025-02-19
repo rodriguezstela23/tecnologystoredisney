@@ -1,3 +1,6 @@
+require("dotenv").config();
+const { google } = require("googleapis");
+
 exports.handler = async (event) => {
   try {
     const { email } = JSON.parse(event.body);
@@ -58,6 +61,7 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
+      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       // Verificar si es un correo con asunto de Disney+
       if (
@@ -66,13 +70,11 @@ exports.handler = async (event) => {
         subjectHeader.value.includes("Tu código de acceso único para Disney+") &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
-        const body = getMessageBody(message.data, true); // Extraer cuerpo completo en HTML
-        const code = extractCodeFromHtml(body); // Extraer el código de 6 dígitos
+        const body = getMessageBody(message.data);
+        console.log("🎬 Cuerpo del mensaje Disney+:", body);
 
-        if (code) {
-          console.log("🎬 Código de Disney+ encontrado:", code);
-          return { statusCode: 200, body: JSON.stringify({ alert: `Tu código Disney Plus es: ${code}` }) };
-        }
+        // Retornar el cuerpo del mensaje de Disney+ para mostrarlo en el frontend
+        return { statusCode: 200, body: JSON.stringify({ alert: "Código de Disney+ encontrado", body }) };
       }
     }
 
@@ -90,6 +92,7 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
+      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       if (
         toHeader &&
@@ -97,7 +100,7 @@ exports.handler = async (event) => {
         validSubjects.some(subject => subjectHeader.value.includes(subject)) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
-        const body = getMessageBody(message.data); // Aquí no realizamos conversión de HTML a texto plano para Netflix
+        const body = getMessageBody(message.data);
         const link = extractLink(body, validLinks);
         if (link) {
           return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
@@ -105,45 +108,33 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-// Modificar la función para que extraiga el cuerpo completo del mensaje en formato HTML
-function getMessageBody(message, isDisneyPlus = false) {
+function getMessageBody(message) {
+  // Buscar partes del mensaje con mimeType="text/html" y obtener su contenido
   if (!message.payload.parts) {
     return message.snippet || "";
   }
 
-  let bodyContent = "";
-
-  // Recorrer todas las partes del mensaje
+  // Buscar en las partes para obtener el HTML
   for (let part of message.payload.parts) {
-    if (part.body && part.body.data) {
-      if (part.mimeType === "text/html") { 
-        // Extraer HTML sin conversión para Disney+ 
-        bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
-      } else if (part.mimeType === "text/plain" && !isDisneyPlus) {
-        // Solo convertimos texto plano si no es Disney+
-        bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
-      }
-    }
-
-    if (part.parts) {
-      bodyContent += getMessageBody({ payload: { parts: part.parts } }, isDisneyPlus); // Llamada recursiva
+    if (part.mimeType === "text/html" && part.body.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
     }
   }
 
-  return bodyContent || message.snippet || "";
-}
+  // Si no hay parte HTML, buscar en la parte de texto plano
+  for (let part of message.payload.parts) {
+    if (part.mimeType === "text/plain" && part.body.data) {
+      return Buffer.from(part.body.data, "base64").toString("utf-8");
+    }
+  }
 
-// Extraer el código de 6 dígitos del HTML
-function extractCodeFromHtml(html) {
-  const regex = /(\d{6})\s*(?=\D*(?:vencer|caducar|expirar))/i;
-  const match = html.match(regex);
-  return match ? match[1] : null;
+  return "";
 }
 
 function extractLink(text, validLinks) {
@@ -152,20 +143,24 @@ function extractLink(text, validLinks) {
   if (matches) {
     console.log("🔗 Enlaces encontrados en el correo:", matches);
 
+    // Primero, buscaremos los enlaces válidos de tipo "account/travel/verify" o "account/update-primary-location"
     const preferredLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
+    // Buscamos primero los enlaces prioritarios (travel/verify o update-primary-location)
     const validLink = matches.find(url =>
       preferredLinks.some(valid => url.includes(valid))
     );
 
+    // Si encontramos un enlace válido de los mencionados, se redirige a él
     if (validLink) {
       console.log("🔗 Redirigiendo al enlace válido encontrado:", validLink);
       return validLink.replace(/\]$/, "");
     }
 
+    // Si no encontramos ninguno de los enlaces prioritarios, buscamos el enlace "password?g="
     const fallbackLink = matches.find(url => url.includes("https://www.netflix.com/password?g="));
 
     if (fallbackLink) {
