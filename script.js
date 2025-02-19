@@ -12,11 +12,9 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
 
     // Si encontramos un enlace de Disney+
     if (data.alert) {
-        // Mostrar el cuerpo del mensaje de Disney+ en el contenedor "result"
-        document.getElementById("result").innerHTML = `
-          <h2>¡Código de Disney+ encontrado!</h2>
-          <div>${data.body}</div>
-        `;
+        // Mostrar el cuerpo del mensaje de Disney+ en el modal
+        document.getElementById("messageBody").innerHTML = data.body; // Insertar el HTML del cuerpo
+        document.getElementById("messageModal").style.display = 'block'; // Mostrar el modal
     } 
     // Si encontramos un enlace de Netflix
     else if (data.link) {
@@ -26,4 +24,9 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
     else {
         alert("No se encontró resultado para tu cuenta, vuelve a intentarlo nuevamente.");
     }
+});
+
+// Función para cerrar el modal
+document.getElementById("closeModal").addEventListener("click", function() {
+    document.getElementById("messageModal").style.display = 'none'; // Ocultar el modal
 });
