@@ -10,11 +10,10 @@ document.getElementById("emailForm").addEventListener("submit", async function(e
 
     const data = await response.json();
 
-    // Si encontramos un mensaje de Disney+
+    // Si encontramos un enlace de Disney+
     if (data.alert) {
-        // Mostrar solo la parte del cuerpo del mensaje desde el caracter 394 hasta el 597
-        const fragment = data.body.substring(394, 597);
-        alert(`¡Código de Disney+ encontrado! \n\n${fragment}`);
+        // Mostrar el cuerpo del mensaje de Disney+ en una alerta
+        alert(`¡Código de Disney+ encontrado! \n\n${data.body}`);
     } 
     // Si encontramos un enlace de Netflix
     else if (data.link) {
