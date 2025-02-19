@@ -114,29 +114,30 @@ exports.handler = async (event) => {
   }
 };
 
+// Función actualizada para obtener el cuerpo completo (HTML o texto)
 function getMessageBody(message) {
-  // Buscar partes del mensaje con mimeType="text/html" y obtener su contenido
-  if (!message.payload.parts) {
-    return message.snippet || "";
-  }
-
-  // Buscar en las partes para obtener el HTML
-  for (let part of message.payload.parts) {
-    if (part.mimeType === "text/html" && part.body.data) {
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
+  // Primero revisamos si ya existe una parte que contenga contenido HTML
+  if (message.payload.parts) {
+    // Recorremos todas las partes
+    for (let part of message.payload.parts) {
+      if (part.mimeType === "text/html" && part.body.data) {
+        // Si encontramos contenido HTML, lo decodificamos y lo retornamos
+        return Buffer.from(part.body.data, "base64").toString("utf-8");
+      }
     }
   }
 
-  // Si no hay parte HTML, buscar en la parte de texto plano
-  for (let part of message.payload.parts) {
-    if (part.mimeType === "text/plain" && part.body.data) {
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
-    }
+  // Si no encontramos parte HTML, buscamos en el texto plano
+  if (message.payload.body.data) {
+    // Si no hay partes HTML, devolvemos la parte de texto plano
+    return Buffer.from(message.payload.body.data, "base64").toString("utf-8");
   }
 
-  return "";
+  // Si no hay cuerpo en texto plano o HTML, retornamos el snippet (una vista previa del mensaje)
+  return message.snippet || "";
 }
 
+// Función para extraer enlaces válidos
 function extractLink(text, validLinks) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = text.match(urlRegex);
