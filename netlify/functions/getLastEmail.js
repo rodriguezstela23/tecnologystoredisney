@@ -70,7 +70,7 @@ exports.handler = async (event) => {
         subjectHeader.value.includes("Tu código de acceso único para Disney+") &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
-        const body = getMessageBody(message.data);
+        const body = getMessageBody(message.data, true); // Aquí solo convertimos el cuerpo de Disney+ a texto plano
         console.log("🎬 Cuerpo del mensaje Disney+:", body);
 
         // Retornar el cuerpo del mensaje de Disney+ para mostrarlo en el frontend
@@ -100,7 +100,7 @@ exports.handler = async (event) => {
         validSubjects.some(subject => subjectHeader.value.includes(subject)) &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
-        const body = getMessageBody(message.data);
+        const body = getMessageBody(message.data); // Aquí no realizamos conversión de HTML a texto plano para Netflix
         const link = extractLink(body, validLinks);
         if (link) {
           return { statusCode: 200, body: JSON.stringify({ link: link.replace(/\]$/, "") }) };
@@ -108,36 +108,35 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-function getMessageBody(message) {
+function getMessageBody(message, isDisneyPlus = false) {
   if (!message.payload.parts) {
     return message.snippet || "";
   }
 
-  // Recorrer todas las partes del mensaje y devolver el contenido completo.
   let bodyContent = "";
 
+  // Recorrer todas las partes del mensaje
   for (let part of message.payload.parts) {
-    // Si tiene un cuerpo de datos en base64, lo decodificamos.
     if (part.body && part.body.data) {
-      if (part.mimeType === "text/plain" || part.mimeType === "text/html") {
-        // Decodificar base64 a texto.
+      if (part.mimeType === "text/plain") {
         bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
+      } else if (part.mimeType === "text/html" && isDisneyPlus) {
+        let htmlContent = Buffer.from(part.body.data, "base64").toString("utf-8");
+        bodyContent += convertHtmlToText(htmlContent); // Solo convertimos HTML a texto plano si es un correo de Disney+
       }
     }
 
-    // Si la parte tiene subpartes (por ejemplo, un correo con un adjunto), las recorremos también.
     if (part.parts) {
-      bodyContent += getMessageBody({ payload: { parts: part.parts } }); // Llamada recursiva
+      bodyContent += getMessageBody({ payload: { parts: part.parts } }, isDisneyPlus); // Llamada recursiva
     }
   }
 
-  // Si no se encontró nada, devolvemos el fragmento.
   return bodyContent || message.snippet || "";
 }
 
@@ -147,24 +146,20 @@ function extractLink(text, validLinks) {
   if (matches) {
     console.log("🔗 Enlaces encontrados en el correo:", matches);
 
-    // Primero, buscaremos los enlaces válidos de tipo "account/travel/verify" o "account/update-primary-location"
     const preferredLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
-    // Buscamos primero los enlaces prioritarios (travel/verify o update-primary-location)
     const validLink = matches.find(url =>
       preferredLinks.some(valid => url.includes(valid))
     );
 
-    // Si encontramos un enlace válido de los mencionados, se redirige a él
     if (validLink) {
       console.log("🔗 Redirigiendo al enlace válido encontrado:", validLink);
       return validLink.replace(/\]$/, "");
     }
 
-    // Si no encontramos ninguno de los enlaces prioritarios, buscamos el enlace "password?g="
     const fallbackLink = matches.find(url => url.includes("https://www.netflix.com/password?g="));
 
     if (fallbackLink) {
@@ -173,4 +168,9 @@ function extractLink(text, validLinks) {
     }
   }
   return null;
+}
+
+// Función para convertir HTML a texto plano
+function convertHtmlToText(html) {
+  return html.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
 }
