@@ -62,9 +62,13 @@ exports.handler = async (event) => {
       ) {
         const body = getMessageBody(message.data);
         console.log("🎬 Cuerpo del mensaje Disney+:", body);
+
+        // Aquí manejamos el desplazamiento del mensaje de Disney+
+        // Simulamos la interacción para el frontend
+        const bodyWithScroll = addScrollingEffect(body);
         
-        // Si encontramos Disney+, retornamos el cuerpo
-        return { statusCode: 200, body: JSON.stringify({ alert: "Código de Disney+ encontrado", body }) };
+        // Si encontramos Disney+, retornamos el cuerpo con la animación de desplazamiento
+        return { statusCode: 200, body: JSON.stringify({ alert: "Código de Disney+ encontrado", body: bodyWithScroll }) };
       }
     }
 
@@ -128,6 +132,16 @@ function getMessageBody(message) {
     }
   }
   return "";
+}
+
+// Función para agregar desplazamiento (scrolling) al cuerpo de Disney+
+function addScrollingEffect(body) {
+  // Aquí vamos a envolver el cuerpo del mensaje en un div con clases para el efecto de scroll
+  return `
+    <div style="max-height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+      ${body}
+    </div>
+  `;
 }
 
 // Función para extraer enlaces válidos
