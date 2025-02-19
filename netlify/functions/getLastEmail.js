@@ -43,8 +43,7 @@ exports.handler = async (event) => {
     const validLinks = [
       "https://www.netflix.com/account/travel/verify?nftoken=",
       "https://www.netflix.com/password?g=",
-      "https://www.netflix.com/account/update-primary-location?nftoken=",
-      "https://www.disneyplus.com/codigo" // Enlace que podría ser válido para Disney+
+      "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
     // Primero, busca correos con el asunto de Disney+ y procesa antes de los de Netflix
@@ -108,7 +107,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encontra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
