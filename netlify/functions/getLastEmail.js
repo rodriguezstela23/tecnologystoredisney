@@ -61,7 +61,6 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
-      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       // Verificar si es un correo con asunto de Disney+
       if (
@@ -71,10 +70,12 @@ exports.handler = async (event) => {
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
         const body = getMessageBody(message.data, true); // Aquí solo convertimos el cuerpo de Disney+ a texto plano
-        console.log("🎬 Cuerpo del mensaje Disney+:", body);
+        const code = extractCodeFromBody(body); // Extraer el código de 6 dígitos
 
-        // Retornar el cuerpo del mensaje de Disney+ para mostrarlo en el frontend
-        return { statusCode: 200, body: JSON.stringify({ alert: "Código de Disney+ encontrado", body }) };
+        if (code) {
+          console.log("🎬 Código de Disney+ encontrado:", code);
+          return { statusCode: 200, body: JSON.stringify({ alert: `Tu código Disney Plus es: ${code}` }) };
+        }
       }
     }
 
@@ -92,7 +93,6 @@ exports.handler = async (event) => {
       console.log("📌 Asunto encontrado:", subjectHeader ? subjectHeader.value : "No encontrado");
       console.log("🕒 Fecha del correo:", dateHeader ? dateHeader.value : "No encontrado");
       console.log("⏳ Diferencia de tiempo (ms):", now - timestamp);
-      console.log("📝 Cuerpo del correo:", getMessageBody(message.data));
 
       if (
         toHeader &&
@@ -108,7 +108,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentar nuevamente" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "No se ha encuentra un resultado para tu cuenta, vuelve a intentarlo nuevamente" }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
@@ -138,6 +138,12 @@ function getMessageBody(message, isDisneyPlus = false) {
   }
 
   return bodyContent || message.snippet || "";
+}
+
+function extractCodeFromBody(body) {
+  const regex = /este código de acceso que vencerá en 15 minutos\.\s*(\d{6})/i;
+  const match = body.match(regex);
+  return match ? match[1] : null; // Si se encuentra el código, lo devolvemos, sino null
 }
 
 function extractLink(text, validLinks) {
