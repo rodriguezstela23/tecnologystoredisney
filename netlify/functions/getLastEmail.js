@@ -118,12 +118,27 @@ function getMessageBody(message) {
   if (!message.payload.parts) {
     return message.snippet || "";
   }
+
+  // Recorrer todas las partes del mensaje y devolver el contenido completo.
+  let bodyContent = "";
+
   for (let part of message.payload.parts) {
-    if (part.mimeType === "text/plain" && part.body.data) {
-      return Buffer.from(part.body.data, "base64").toString("utf-8");
+    // Si tiene un cuerpo de datos en base64, lo decodificamos.
+    if (part.body && part.body.data) {
+      if (part.mimeType === "text/plain" || part.mimeType === "text/html") {
+        // Decodificar base64 a texto.
+        bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
+      }
+    }
+
+    // Si la parte tiene subpartes (por ejemplo, un correo con un adjunto), las recorremos también.
+    if (part.parts) {
+      bodyContent += getMessageBody({ payload: { parts: part.parts } }); // Llamada recursiva
     }
   }
-  return "";
+
+  // Si no se encontró nada, devolvemos el fragmento.
+  return bodyContent || message.snippet || "";
 }
 
 function extractLink(text, validLinks) {
