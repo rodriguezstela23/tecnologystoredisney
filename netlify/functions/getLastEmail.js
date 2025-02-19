@@ -1,6 +1,3 @@
-require("dotenv").config();
-const { google } = require("googleapis");
-
 exports.handler = async (event) => {
   try {
     const { email } = JSON.parse(event.body);
@@ -69,8 +66,8 @@ exports.handler = async (event) => {
         subjectHeader.value.includes("Tu código de acceso único para Disney+") &&
         (now - timestamp) <= 10 * 60 * 1000 // Aumentar a 10 minutos para pruebas
       ) {
-        const body = getMessageBody(message.data, true); // Aquí solo convertimos el cuerpo de Disney+ a texto plano
-        const code = extractCodeFromBody(body); // Extraer el código de 6 dígitos
+        const body = getMessageBody(message.data, true); // Extraer cuerpo completo en HTML
+        const code = extractCodeFromHtml(body); // Extraer el código de 6 dígitos
 
         if (code) {
           console.log("🎬 Código de Disney+ encontrado:", code);
@@ -114,6 +111,7 @@ exports.handler = async (event) => {
   }
 };
 
+// Modificar la función para que extraiga el cuerpo completo del mensaje en formato HTML
 function getMessageBody(message, isDisneyPlus = false) {
   if (!message.payload.parts) {
     return message.snippet || "";
@@ -124,11 +122,12 @@ function getMessageBody(message, isDisneyPlus = false) {
   // Recorrer todas las partes del mensaje
   for (let part of message.payload.parts) {
     if (part.body && part.body.data) {
-      if (part.mimeType === "text/plain") {
+      if (part.mimeType === "text/html") { 
+        // Extraer HTML sin conversión para Disney+ 
         bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
-      } else if (part.mimeType === "text/html" && isDisneyPlus) {
-        let htmlContent = Buffer.from(part.body.data, "base64").toString("utf-8");
-        bodyContent += convertHtmlToText(htmlContent); // Solo convertimos HTML a texto plano si es un correo de Disney+
+      } else if (part.mimeType === "text/plain" && !isDisneyPlus) {
+        // Solo convertimos texto plano si no es Disney+
+        bodyContent += Buffer.from(part.body.data, "base64").toString("utf-8");
       }
     }
 
@@ -140,10 +139,11 @@ function getMessageBody(message, isDisneyPlus = false) {
   return bodyContent || message.snippet || "";
 }
 
-function extractCodeFromBody(body) {
-  const regex = /este código de acceso que vencerá en 15 minutos\.\s*(\d{6})/i;
-  const match = body.match(regex);
-  return match ? match[1] : null; // Si se encuentra el código, lo devolvemos, sino null
+// Extraer el código de 6 dígitos del HTML
+function extractCodeFromHtml(html) {
+  const regex = /(\d{6})\s*(?=\D*(?:vencer|caducar|expirar))/i;
+  const match = html.match(regex);
+  return match ? match[1] : null;
 }
 
 function extractLink(text, validLinks) {
@@ -174,9 +174,4 @@ function extractLink(text, validLinks) {
     }
   }
   return null;
-}
-
-// Función para convertir HTML a texto plano
-function convertHtmlToText(html) {
-  return html.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
 }
