@@ -1,6 +1,12 @@
 require("dotenv").config();
 const { google } = require("googleapis");
 
+// Función para generar un retraso aleatorio entre 1 y 10 segundos
+function delay() {
+  const delayTime = Math.floor(Math.random() * (9000 - 1000 + 1)) + 1000; // Aleatorio entre 1000ms (1s) y 10000ms (10s)
+  return new Promise(resolve => setTimeout(resolve, delayTime)); // Devuelve una promesa que se resuelve después del delay
+}
+
 exports.handler = async (event) => {
   try {
     const { email } = JSON.parse(event.body);
@@ -20,6 +26,9 @@ exports.handler = async (event) => {
     // 🔹 Verificar en qué cuenta está buscando correos
     const gmailProfile = await gmail.users.getProfile({ userId: "me" });
     console.log("🔍 Buscando correos en la cuenta:", gmailProfile.data.emailAddress);
+
+    // Pausa aleatoria antes de realizar la búsqueda de correos
+    await delay();
 
     const response = await gmail.users.messages.list({
       userId: "me",
@@ -41,6 +50,7 @@ exports.handler = async (event) => {
       "https://www.disneyplus.com/codigo" // Enlace que podría ser válido para Disney+
     ];
 
+    // Procesar los mensajes de Disney+
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
@@ -84,6 +94,7 @@ exports.handler = async (event) => {
       "https://www.netflix.com/account/update-primary-location?nftoken="
     ];
 
+  
     for (let msg of response.data.messages) {
       const message = await gmail.users.messages.get({ userId: "me", id: msg.id });
       const headers = message.data.payload.headers;
